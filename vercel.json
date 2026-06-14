@@ -1,0 +1,20 @@
+{
+  "framework": "nextjs",
+  "regions": ["sin1"],
+  "functions": {
+    "app/api/google-ads/campaigns/create/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/google-ads/assets/upload/route.ts": {
+      "maxDuration": 60
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    }
+  ]
+}
