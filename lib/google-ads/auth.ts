@@ -15,6 +15,27 @@ export class GoogleAdsAPIError extends Error {
   }
 }
 
+export function getGoogleAdsAppConfig() {
+  const clientId = process.env.GOOGLE_CLIENT_ID || "";
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || "";
+  const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "";
+  const missing = [
+    ["GOOGLE_CLIENT_ID", clientId],
+    ["GOOGLE_CLIENT_SECRET", clientSecret],
+    ["GOOGLE_ADS_DEVELOPER_TOKEN", developerToken],
+  ]
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+
+  return {
+    clientId,
+    clientSecret,
+    developerToken,
+    configured: missing.length === 0,
+    missing,
+  };
+}
+
 export async function getStoredCredentials(userId: string, supabase: SupabaseClient = createServiceClient()): Promise<GoogleAdsCredentials> {
   const { data, error } = await supabase.rpc("get_google_ads_credentials", { p_user_id: userId }).single();
 

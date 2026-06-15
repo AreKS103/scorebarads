@@ -32,6 +32,21 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  async function routeAfterAuth(userId: string) {
+    const supabase = createClient();
+    const { data } = await supabase.rpc("get_google_ads_credentials", { p_user_id: userId }).maybeSingle();
+    const credentials = data as { refresh_token?: string | null; customer_id?: string | null } | null;
+
+    if (credentials?.refresh_token && credentials?.customer_id) {
+      router.push("/dashboard");
+      router.refresh();
+      return;
+    }
+
+    router.push("/connect");
+    router.refresh();
+  }
+
   useEffect(() => {
     setNotice(getInitialNotice());
     if (!isSupabaseConfigured()) return;
@@ -41,7 +56,7 @@ export default function LoginPage() {
 
     supabase.auth.getUser().then(({ data }) => {
       if (isMounted && data.user) {
-        router.replace("/dashboard");
+        void routeAfterAuth(data.user.id);
       }
     });
 
@@ -79,8 +94,10 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
-    router.refresh();
+    const { data } = await createClient().auth.getUser();
+    if (data.user) {
+      await routeAfterAuth(data.user.id);
+    }
   }
 
   async function handleSignUp(event: React.FormEvent<HTMLFormElement>) {
@@ -126,8 +143,7 @@ export default function LoginPage() {
     }
 
     if (data.session) {
-      router.push("/dashboard");
-      router.refresh();
+      await routeAfterAuth(data.session.user.id);
       return;
     }
 
