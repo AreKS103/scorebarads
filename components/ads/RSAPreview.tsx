@@ -23,7 +23,7 @@ export function RSAPreview({ creative }: RSAPreviewProps) {
   const path = [creative.path1, creative.path2].filter(Boolean).join("/");
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="rounded-lg border border-border bg-card p-4">
       <p className="text-xs text-muted-foreground">Sponsored</p>
       <p className="mt-1 text-sm text-green-700">{url.replace(/^https?:\/\//, "")}{path ? `/${path}` : ""}</p>
       <h4 className="mt-1 text-xl font-medium leading-snug text-blue-700">{activeHeadlines.join(" | ")}</h4>

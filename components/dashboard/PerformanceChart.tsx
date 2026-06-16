@@ -15,11 +15,11 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
   }));
 
   if (chartData.length === 0) {
-    return <div className="flex h-72 items-center justify-center rounded-xl border border-dashed border-border bg-card text-sm text-muted-foreground">No reporting rows returned for this date range.</div>;
+    return <div className="flex h-72 items-center justify-center rounded-lg border border-dashed border-border bg-card text-sm text-muted-foreground">No reporting rows returned for this date range.</div>;
   }
 
   return (
-    <div className="h-80 w-full rounded-xl border border-border bg-card p-4">
+    <div className="h-80 w-full rounded-lg border border-border bg-card p-4">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={chartData} margin={{ left: 0, right: 12, top: 10, bottom: 0 }}>
           <defs>

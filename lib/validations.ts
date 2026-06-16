@@ -57,21 +57,33 @@ export const basicsSchema = z
     }
   });
 
-export const targetingSchema = z.object({
-  locationPreset: z.enum(["CAMBODIA", "PHNOM_PENH", "BKK1_5KM", "CUSTOM"]),
-  customGeoTarget: z.string().optional(),
-  languages: z.array(z.enum(["English", "Khmer", "Korean", "French"])).min(1, "Choose at least one language."),
-  adSchedule: z.array(
-    z.object({
-      day: z.enum(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]),
-      enabled: z.boolean(),
-      startHour: z.coerce.number().min(0).max(23),
-      endHour: z.coerce.number().min(1).max(24),
-    }),
-  ),
-  devices: z.array(z.enum(["MOBILE", "DESKTOP", "TABLET"])).min(1, "Choose at least one device."),
-  geoRadiusKm: z.coerce.number().positive().optional(),
-});
+export const targetingSchema = z
+  .object({
+    locationPreset: z.enum(["CAMBODIA", "PHNOM_PENH", "BKK1_5KM", "CUSTOM"]),
+    customGeoTarget: z.string().optional(),
+    languages: z.array(z.enum(["English", "Khmer", "Korean", "French"])).min(1, "Choose at least one language."),
+    adSchedule: z.array(
+      z.object({
+        day: z.enum(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]),
+        enabled: z.boolean(),
+        startHour: z.coerce.number().min(0).max(23),
+        endHour: z.coerce.number().min(1).max(24),
+      }),
+    ),
+    devices: z.array(z.enum(["MOBILE", "DESKTOP", "TABLET"])).min(1, "Choose at least one device."),
+    geoRadiusKm: z.coerce.number().positive().optional(),
+  })
+  .superRefine((value, context) => {
+    value.adSchedule.forEach((block, index) => {
+      if (block.enabled && block.endHour <= block.startHour) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["adSchedule", index, "endHour"],
+          message: "End time must be after the start time.",
+        });
+      }
+    });
+  });
 
 export const keywordsSchema = z.object({
   rawKeywords: z.string(),

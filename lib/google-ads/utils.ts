@@ -33,7 +33,8 @@ export function formatGAQLDate(date: Date): string {
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, "0");
   const day = String(date.getUTCDate()).padStart(2, "0");
-  return `${year}${month}${day}`;
+  // Google Ads REST fields and GAQL date literals use ISO calendar dates.
+  return `${year}-${month}-${day}`;
 }
 
 export function toGoogleAdsDate(input?: string | Date): string | undefined {
@@ -398,8 +399,37 @@ export function buildCampaignCriterionPayload(formData: CampaignFormData, campai
     };
   });
 
+  const adScheduleOperations = formData.targeting.adSchedule
+    .filter((block) => block.enabled)
+    .map((block) => ({
+      create: {
+        campaign: campaignResourceName,
+        adSchedule: {
+          dayOfWeek: block.day,
+          startHour: block.startHour,
+          startMinute: "ZERO",
+          endHour: block.endHour,
+          endMinute: "ZERO",
+        },
+      },
+    }));
+
+  // Google Ads targets all devices by default. If the form excludes a device,
+  // create a device criterion with bidModifier -1 to opt out of that device.
+  const allDevices: Array<"MOBILE" | "DESKTOP" | "TABLET"> = ["MOBILE", "DESKTOP", "TABLET"];
+  const selectedDevices = new Set(formData.targeting.devices);
+  const deviceOperations = allDevices
+    .filter((device) => !selectedDevices.has(device))
+    .map((device) => ({
+      create: {
+        campaign: campaignResourceName,
+        device: { type: device },
+        bidModifier: -1,
+      },
+    }));
+
   return {
-    operations: [...geoOperations, ...languageOperations],
+    operations: [...geoOperations, ...languageOperations, ...adScheduleOperations, ...deviceOperations],
   };
 }
 

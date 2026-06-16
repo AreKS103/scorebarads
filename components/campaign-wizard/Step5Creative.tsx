@@ -71,7 +71,7 @@ export function Step5Creative() {
       </TabsList>
 
       <TabsContent value="search" className="space-y-5">
-        <Card className="border-orange-200 bg-orange-50 p-4 text-sm text-foreground"><Lightbulb className="mr-2 inline h-4 w-4 text-primary" />Paste this into Perplexity: Write 10 Google Ads headlines (max 30 chars) and 3 descriptions (max 90 chars) for Score Sports Bar & Grill in Phnom Penh.</Card>
+        <Card className="rounded-lg border border-border bg-card p-4 text-sm text-foreground"><Lightbulb className="mr-2 inline h-4 w-4 text-muted-foreground" />Paste this into Perplexity: Write 10 Google Ads headlines (max 30 chars) and 3 descriptions (max 90 chars) for Score Sports Bar & Grill in Phnom Penh.</Card>
         <TextAssetInputs items={creative.search.headlines} labelPrefix="H" limit={30} allowPin onChange={(headlines) => updateCreative({ search: { ...creative.search, headlines } })} />
         <TextAssetInputs items={creative.search.descriptions} labelPrefix="D" limit={90} onChange={(descriptions) => updateCreative({ search: { ...creative.search, descriptions } })} />
         <div className="grid gap-5 md:grid-cols-3">

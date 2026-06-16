@@ -2,11 +2,12 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { jsonError, jsonSuccess, requireUser } from "@/lib/api";
 import { updateCampaignStatus } from "@/lib/google-ads/campaigns";
+import { withCsrfCheck } from "@/lib/security";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const statusSchema = z.object({ status: z.enum(["ENABLED", "PAUSED"]) });
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export const POST = withCsrfCheck(async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { user } = await requireUser();
     const { status } = statusSchema.parse(await request.json());
@@ -23,4 +24,4 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   } catch (error) {
     return jsonError(error, 400);
   }
-}
+});

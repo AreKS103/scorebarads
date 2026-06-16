@@ -9,6 +9,7 @@ type HealthCheck = {
   anonKey: boolean;
   serviceRoleKey: boolean;
   schemaReady: boolean;
+  encryptionKeyReady: boolean;
 };
 
 export async function GET() {
@@ -22,6 +23,7 @@ export async function GET() {
     anonKey: Boolean(anonKey),
     serviceRoleKey: Boolean(serviceRoleKey),
     schemaReady: false,
+    encryptionKeyReady: false,
   };
 
   if (!supabaseUrl || !anonKey) {
@@ -42,17 +44,24 @@ export async function GET() {
     },
   });
 
-  const { error } = await supabase
+  const { error: schemaError } = await supabase
     .from("campaigns_log")
     .select("id", { count: "exact", head: true });
 
-  checks.schemaReady = !error;
+  checks.schemaReady = !schemaError;
+
+  const { error: encryptionError } = serviceRoleKey
+    ? await supabase.rpc("google_ads_encryption_key")
+    : { error: new Error("SUPABASE_SERVICE_ROLE_KEY is required to verify encrypted credential storage.") };
+
+  checks.encryptionKeyReady = !encryptionError;
+  const error = schemaError || encryptionError;
 
   return NextResponse.json(
     {
       ok: !error,
       checks,
-      message: error ? error.message : "Supabase environment and schema are reachable.",
+      message: error ? error.message : "Supabase environment, schema, and encrypted credential storage are reachable.",
     },
     { status: error ? 503 : 200 }
   );

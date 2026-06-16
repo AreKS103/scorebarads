@@ -1,15 +1,15 @@
 import { jsonError, jsonSuccess, requireUser } from "@/lib/api";
-import { getGoogleAdsAppConfig } from "@/lib/google-ads/auth";
+import { credentialsMatchAppConfig, getGoogleAdsAppConfig, resolveGoogleAdsCredentials, syncGoogleAdsAppCredentials } from "@/lib/google-ads/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { GoogleAdsCredentials } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { user } = await requireUser();
     const supabase = createServiceClient();
-    const appConfig = getGoogleAdsAppConfig();
+    const appConfig = getGoogleAdsAppConfig(request);
     const { data, error } = await supabase
       .rpc("get_google_ads_credentials", { p_user_id: user.id })
       .maybeSingle();
@@ -18,22 +18,34 @@ export async function GET() {
       throw error;
     }
 
-    const credentials = data as GoogleAdsCredentials | null;
+    let credentials = data as GoogleAdsCredentials | null;
+    const credentialsWereSynced = appConfig.configured && !credentialsMatchAppConfig(credentials, appConfig);
+
+    if (credentialsWereSynced) {
+      credentials = await syncGoogleAdsAppCredentials(user.id, supabase, credentials);
+    }
+
+    const resolved = resolveGoogleAdsCredentials(credentials, appConfig);
 
     return jsonSuccess({
       appConfig: {
         configured: appConfig.configured,
         missing: appConfig.missing,
+        warnings: appConfig.warnings,
+        appUrl: appConfig.publicAppUrl,
+        redirectUri: appConfig.redirectUri,
         hasClientId: Boolean(appConfig.clientId),
         hasClientSecret: Boolean(appConfig.clientSecret),
         hasDeveloperToken: Boolean(appConfig.developerToken),
       },
       credentials: {
         saved: Boolean(credentials),
-        hasOAuth: Boolean(credentials?.refresh_token),
-        hasCustomerId: Boolean(credentials?.customer_id),
-        customerId: credentials?.customer_id || "",
-        managerCustomerId: credentials?.manager_customer_id || "",
+        hasOAuth: Boolean(resolved.refreshToken),
+        hasCustomerId: Boolean(resolved.customerId),
+        customerId: resolved.customerId || "",
+        managerCustomerId: resolved.managerCustomerId || "",
+        usingEnvironmentCredentials: resolved.source === "environment",
+        appCredentialsSynced: credentialsWereSynced,
       },
     });
   } catch (error) {

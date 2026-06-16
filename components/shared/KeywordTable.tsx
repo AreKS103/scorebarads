@@ -18,14 +18,14 @@ export function KeywordTable({ ideas, selected, onToggle, onAddSelected }: Keywo
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border p-3">
-        <p className="text-sm font-semibold text-foreground">Keyword Planner suggestions</p>
+    <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="flex h-10 items-center justify-between border-b border-border px-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Keyword Planner suggestions</p>
         <Button size="sm" onClick={onAddSelected} disabled={selected.length === 0}>Add selected</Button>
       </div>
       <div className="max-h-80 overflow-auto">
         <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="bg-secondary text-xs uppercase text-foreground">
+          <thead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="w-12 px-3 py-2">Add</th>
               <th className="px-3 py-2">Keyword</th>
@@ -35,7 +35,7 @@ export function KeywordTable({ ideas, selected, onToggle, onAddSelected }: Keywo
               <th className="px-3 py-2">Top bid high</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-border">
             {ideas.map((idea) => (
               <tr key={idea.keyword} className="hover:bg-muted/40">
                 <td className="px-3 py-2"><Checkbox checked={selected.includes(idea.keyword)} onCheckedChange={() => onToggle(idea.keyword)} /></td>

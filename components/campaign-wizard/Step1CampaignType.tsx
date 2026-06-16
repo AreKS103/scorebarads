@@ -19,17 +19,17 @@ export function Step1CampaignType() {
   const { formData, setCampaignType } = useWizardStore();
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
       {types.map((item) => {
         const selected = formData.campaignType === item.type;
         return (
           <button key={item.type} type="button" onClick={() => setCampaignType(item.type)} className="text-left">
-            <Card className={cn("h-full p-5 transition-all hover:border-primary", selected && "border-primary ring-2 ring-primary/20")}> 
+            <Card className={cn("h-full rounded-lg border border-border bg-card p-4 transition-colors hover:bg-muted/50", selected && "bg-accent text-accent-foreground")}> 
               <div className="flex items-start justify-between gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary text-foreground"><item.icon className="h-6 w-6" /></div>
-                {item.recommended ? <Badge variant="orange"><Trophy className="mr-1 h-3 w-3" />World Cup</Badge> : null}
+                <item.icon className="h-4 w-4 text-muted-foreground" />
+                {item.recommended ? <Badge variant="default"><Trophy className="mr-1 h-3 w-3" />World Cup</Badge> : null}
               </div>
-              <h3 className="mt-4 text-lg font-bold text-foreground">{item.name}</h3>
+              <h3 className="mt-4 text-sm font-medium text-foreground">{item.name}</h3>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
             </Card>
           </button>

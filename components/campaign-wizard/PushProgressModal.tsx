@@ -110,8 +110,8 @@ export function PushProgressModal({ open, formData, onOpenChange }: PushProgress
             const event = latestByStep.get(step);
             const status = event?.status || "pending";
             return (
-              <div key={step} className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3 text-sm">
-                {status === "success" || status === "skipped" ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : status === "running" ? <LoadingSpinner className="text-primary" /> : status === "error" ? <XCircle className="h-5 w-5 text-red-600" /> : <Circle className="h-5 w-5 text-gray-300" />}
+              <div key={step} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 text-sm">
+                {status === "success" || status === "skipped" ? <CheckCircle2 className="h-4 w-4 text-muted-foreground" /> : status === "running" ? <LoadingSpinner className="text-muted-foreground" /> : status === "error" ? <XCircle className="h-4 w-4 text-destructive" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
                 <div>
                   <p className="font-semibold text-foreground">{stepLabels[step]}</p>
                   <p className="text-muted-foreground">{event?.message || "Waiting"}</p>
@@ -120,9 +120,9 @@ export function PushProgressModal({ open, formData, onOpenChange }: PushProgress
             );
           })}
         </div>
-        {error ? <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700"><strong>Failed:</strong> {error.message}<pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(error.data, null, 2)}</pre></div> : null}
+        {error ? <div className="rounded-lg border border-border bg-card p-4 text-sm text-destructive"><strong>Failed:</strong> {error.message}<pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(error.data, null, 2)}</pre></div> : null}
         <div className="flex flex-wrap justify-end gap-2">
-          {complete ? <Button variant="secondary" asChild><a href="https://ads.google.com/aw/campaigns" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" />View in Google Ads</a></Button> : null}
+          {complete ? <Button variant="ghost" asChild><a href="https://ads.google.com/aw/campaigns" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" />View in Google Ads</a></Button> : null}
           <Button onClick={close} disabled={hasStarted && !complete && !error}>{complete ? "Go to dashboard" : error ? "Close" : "Working"}</Button>
         </div>
       </DialogContent>

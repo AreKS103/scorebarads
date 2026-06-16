@@ -3,6 +3,7 @@ import { z } from "zod";
 import { jsonError, jsonSuccess, requireUser } from "@/lib/api";
 import { callGoogleAdsAPI, getGoogleAdsAuthContext } from "@/lib/google-ads/auth";
 import { buildKeywordOperations, resourceIdFromName } from "@/lib/google-ads/utils";
+import { withCsrfCheck } from "@/lib/security";
 
 const addKeywordSchema = z.object({
   adGroupResourceName: z.string().optional(),
@@ -30,7 +31,7 @@ async function firstAdGroupResourceName(userId: string, campaignResourceName: st
   return rows[0]?.adGroup?.resourceName as string | undefined;
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export const POST = withCsrfCheck(async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { user } = await requireUser();
     const { adGroupResourceName, keyword, matchType } = addKeywordSchema.parse(await request.json());
@@ -56,9 +57,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   } catch (error) {
     return jsonError(error, 400);
   }
-}
+});
 
-export async function DELETE(request: NextRequest) {
+export const DELETE = withCsrfCheck(async function DELETE(request: NextRequest) {
   try {
     const { user } = await requireUser();
     const { criterionResourceName } = removeKeywordSchema.parse(await request.json());
@@ -76,4 +77,4 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     return jsonError(error, 400);
   }
-}
+});

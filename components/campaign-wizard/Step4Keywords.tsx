@@ -22,7 +22,7 @@ export function Step4Keywords() {
   const update = (patch: Partial<CampaignKeywords>) => updateSection("keywords", patch);
 
   if (formData.campaignType !== "SEARCH") {
-    return <Card className="bg-muted/40 text-sm text-muted-foreground">Keyword targeting is skipped for {formData.campaignType.replace("_", " ")} campaigns.</Card>;
+    return <Card className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">Keyword targeting is skipped for {formData.campaignType.replace("_", " ")} campaigns.</Card>;
   }
 
   async function getIdeas() {
@@ -54,10 +54,10 @@ export function Step4Keywords() {
   return (
     <div className="space-y-5">
       {!tipDismissed ? (
-        <Card className="border-orange-200 bg-orange-50 p-4">
+        <Card className="rounded-lg border border-border bg-card p-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex gap-3">
-              <Lightbulb className="mt-0.5 h-5 w-5 text-primary" />
+              <Lightbulb className="mt-0.5 h-4 w-4 text-muted-foreground" />
               <p className="text-sm text-foreground">Tip: Ask Perplexity AI to generate keyword ideas for your business, then paste them here.</p>
             </div>
             <Button type="button" variant="ghost" size="sm" onClick={() => setTipDismissed(true)}>Dismiss</Button>
@@ -88,7 +88,7 @@ export function Step4Keywords() {
             {isLoading ? <LoadingSpinner /> : <Search className="h-4 w-4" />}
             Get Keyword Ideas
           </Button>
-          {error ? <p className="rounded-lg bg-red-50 p-3 text-sm font-medium text-red-600">{error}</p> : null}
+          {error ? <p className="rounded-lg border border-border bg-card p-3 text-xs font-medium text-destructive">{error}</p> : null}
         </div>
       </div>
 

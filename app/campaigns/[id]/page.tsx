@@ -124,9 +124,9 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background lg:pl-[240px]">
       <AppHeader />
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 lg:px-8">
+      <main className="mx-auto max-w-screen-xl space-y-6 px-6 py-6">
         <Button variant="secondary" asChild><Link href="/dashboard"><ArrowLeft className="h-4 w-4" />Dashboard</Link></Button>
         {isLoading ? <Card className="flex items-center gap-3"><LoadingSpinner className="text-primary" />Loading campaign detail...</Card> : null}
         {error ? <Card className="border-red-200 bg-red-50 text-sm font-medium text-red-700">{error}</Card> : null}

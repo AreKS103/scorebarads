@@ -56,7 +56,7 @@ export function Step3Targeting() {
           <Label>Languages</Label>
           <div className="grid gap-2 sm:grid-cols-2">
             {languages.map((language) => (
-              <label key={language} className="flex items-center gap-2 rounded-lg border border-border bg-card p-3 text-sm font-medium">
+              <label key={language} className="flex items-center gap-2 rounded-lg border border-border bg-card p-3 text-sm font-medium transition-colors hover:bg-muted/50">
                 <Checkbox checked={targeting.languages.includes(language)} onCheckedChange={() => update({ languages: toggleValue(targeting.languages, language) })} />
                 {language}
               </label>
@@ -68,7 +68,7 @@ export function Step3Targeting() {
           <Label>Devices</Label>
           <div className="grid gap-2 sm:grid-cols-3">
             {devices.map((device) => (
-              <label key={device} className="flex items-center gap-2 rounded-lg border border-border bg-card p-3 text-sm font-medium">
+              <label key={device} className="flex items-center gap-2 rounded-lg border border-border bg-card p-3 text-sm font-medium transition-colors hover:bg-muted/50">
                 <Checkbox checked={targeting.devices.includes(device)} onCheckedChange={() => update({ devices: toggleValue(targeting.devices, device) })} />
                 {device.toLowerCase()}
               </label>
@@ -82,8 +82,8 @@ export function Step3Targeting() {
         <Label>Ad Schedule</Label>
         <div className="grid gap-3 lg:grid-cols-2">
           {targeting.adSchedule.map((block, index) => (
-            <div key={block.day} className="grid grid-cols-[1fr_90px_90px_auto] items-center gap-2 rounded-lg border border-border bg-card p-3">
-              <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+            <div key={block.day} className="grid grid-cols-[1fr_90px_90px_auto] items-center gap-2 rounded-lg border border-border bg-card p-3 transition-colors hover:bg-muted/50">
+              <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Checkbox checked={block.enabled} onCheckedChange={(checked) => {
                   const next = targeting.adSchedule.slice();
                   next[index] = { ...block, enabled: Boolean(checked) };

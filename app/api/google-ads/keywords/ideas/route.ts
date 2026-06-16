@@ -2,12 +2,13 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { jsonError, jsonSuccess, requireUser } from "@/lib/api";
 import { getKeywordIdeas } from "@/lib/google-ads/keywords";
+import { withCsrfCheck } from "@/lib/security";
 
 const keywordIdeasSchema = z.object({
   keywords: z.array(z.string().min(1)).min(1).max(20),
 });
 
-export async function POST(request: NextRequest) {
+export const POST = withCsrfCheck(async function POST(request: NextRequest) {
   try {
     const { user } = await requireUser();
     const { keywords } = keywordIdeasSchema.parse(await request.json());
@@ -16,4 +17,4 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return jsonError(error, 400);
   }
-}
+});

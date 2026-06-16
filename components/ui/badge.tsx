@@ -2,15 +2,15 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const badgeVariants = cva("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", {
+const badgeVariants = cva("inline-flex items-center rounded-md border border-border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground", {
   variants: {
     variant: {
-      default: "bg-secondary text-secondary-foreground",
-      success: "bg-green-100 text-green-700",
-      warning: "bg-yellow-100 text-yellow-700",
-      danger: "bg-red-100 text-red-700",
-      orange: "bg-orange-100 text-primary",
-      purple: "bg-purple-100 text-purple-700",
+      default: "",
+      success: "",
+      warning: "",
+      danger: "",
+      orange: "",
+      purple: "",
     },
   },
   defaultVariants: { variant: "default" },

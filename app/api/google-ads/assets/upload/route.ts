@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
 import { jsonError, jsonSuccess, requireUser } from "@/lib/api";
 import { uploadImageAsset, uploadImageToSupabase, validateImageFile } from "@/lib/google-ads/assets";
+import { withCsrfCheck } from "@/lib/security";
 import { createServiceClient } from "@/lib/supabase/server";
 
-export async function POST(request: NextRequest) {
+export const POST = withCsrfCheck(async function POST(request: NextRequest) {
   try {
     const { user } = await requireUser();
     const formData = await request.formData();
@@ -34,4 +35,4 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return jsonError(error, 400);
   }
-}
+});

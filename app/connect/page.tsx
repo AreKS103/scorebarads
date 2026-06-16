@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, ExternalLink, KeyRound, RefreshCw, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Copy, ExternalLink, KeyRound, RefreshCw, ShieldCheck } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AppHeader } from "@/components/shared/AppHeader";
@@ -13,7 +13,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { connectCredentialsSchema } from "@/lib/validations";
 
 const manualCredentialsSchema = connectCredentialsSchema.pick({
@@ -30,6 +30,9 @@ type SetupStatus = {
   appConfig: {
     configured: boolean;
     missing: string[];
+    warnings: string[];
+    appUrl: string;
+    redirectUri: string;
     hasClientId: boolean;
     hasClientSecret: boolean;
     hasDeveloperToken: boolean;
@@ -47,6 +50,10 @@ type AccessibleCustomer = {
   resourceName: string;
   id: string;
   formattedId: string;
+  apiAccessible?: boolean;
+  accessError?: string;
+  testAccount?: boolean | null;
+  descriptiveName?: string;
 };
 
 const mockCustomers: AccessibleCustomer[] = [
@@ -80,9 +87,38 @@ function stepIndex(steps: Array<{ id: SetupStep }>, currentStep: SetupStep) {
 function fallbackSetupStatus(): SetupStatus {
   return {
     success: true,
-    appConfig: { configured: true, missing: [], hasClientId: true, hasClientSecret: true, hasDeveloperToken: true },
+    appConfig: {
+      configured: true,
+      missing: [],
+      warnings: [],
+      appUrl: "http://localhost:3000",
+      redirectUri: "http://localhost:3000/api/google-ads/auth/callback",
+      hasClientId: true,
+      hasClientSecret: true,
+      hasDeveloperToken: true,
+    },
     credentials: { saved: true, hasOAuth: false, hasCustomerId: false, customerId: "", managerCustomerId: "" },
   };
+}
+
+function friendlySetupMessage(message: string) {
+  const normalized = message.replace(/_/g, " ");
+  const lower = normalized.toLowerCase();
+
+  if (lower.includes("redirect_uri_mismatch")) {
+    return "Google rejected the redirect URI. In Google Cloud Console, add the exact redirect URI shown in this wizard to your OAuth Web Client.";
+  }
+  if (lower.includes("access_denied")) {
+    return "Google authorization was cancelled. Click Connect Google account and approve Google Ads access.";
+  }
+  if (lower.includes("missing oauth state") || lower.includes("expired oauth state")) {
+    return "The Google sign-in session expired. Start the Google connection again from this page.";
+  }
+  if (lower.includes("refresh token")) {
+    return "Google did not return a refresh token. Reconnect and approve consent; if it repeats, remove this app from your Google Account third-party access page and connect again.";
+  }
+
+  return normalized;
 }
 
 function ConnectPageContent() {
@@ -100,6 +136,7 @@ function ConnectPageContent() {
   const [customers, setCustomers] = useState<AccessibleCustomer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [managerCustomerId, setManagerCustomerId] = useState("");
+  const [copiedRedirect, setCopiedRedirect] = useState(false);
   const form = useForm<ManualCredentials>({
     resolver: zodResolver(manualCredentialsSchema),
     defaultValues: { developerToken: "", clientId: "", clientSecret: "" },
@@ -139,7 +176,7 @@ function ConnectPageContent() {
   useEffect(() => {
     async function prepare() {
       setIsLoading(true);
-      setMessage(searchParams.get("error") || "");
+      setMessage(friendlySetupMessage(searchParams.get("error") || ""));
 
       if (isMock) {
         setStatus(fallbackSetupStatus());
@@ -155,19 +192,24 @@ function ConnectPageContent() {
         return;
       }
 
-      const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
-        router.push("/login");
+      const authResponse = await fetch("/api/auth/me", { cache: "no-store" });
+      const authResult = await authResponse.json().catch(() => ({}));
+      if (!authResponse.ok || !authResult.success) {
+        router.replace("/login");
         return;
       }
 
-      setUserId(data.user.id);
+      setUserId(authResult.userId);
 
       try {
         await loadStatus(stepFromSearch(searchParams.get("step")));
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Setup status failed.");
+        const errorMessage = error instanceof Error ? error.message : "Setup status failed.";
+        if (/signed in/i.test(errorMessage)) {
+          router.replace("/login");
+          return;
+        }
+        setMessage(friendlySetupMessage(errorMessage));
       } finally {
         setIsLoading(false);
       }
@@ -193,20 +235,16 @@ function ConnectPageContent() {
 
     setIsSaving(true);
     const values = form.getValues();
-    const supabase = createClient();
-    const { error } = await supabase.rpc("upsert_google_ads_credentials", {
-      p_user_id: userId,
-      p_client_id: values.clientId,
-      p_client_secret: values.clientSecret,
-      p_refresh_token: null,
-      p_developer_token: values.developerToken,
-      p_customer_id: null,
-      p_manager_customer_id: null,
+    const response = await fetch("/api/google-ads/setup/credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(values),
     });
+    const result = await response.json();
     setIsSaving(false);
 
-    if (error) {
-      setMessage(error.message);
+    if (!response.ok || !result.success) {
+      setMessage(friendlySetupMessage(result.error || "Could not save Google Ads credentials."));
       return;
     }
 
@@ -235,7 +273,7 @@ function ConnectPageContent() {
     setIsFetchingCustomers(false);
 
     if (!response.ok || !result.success) {
-      setMessage(result.error || "Could not find accessible Google Ads accounts.");
+      setMessage(friendlySetupMessage(result.error || "Could not find accessible Google Ads accounts."));
       return;
     }
 
@@ -275,7 +313,7 @@ function ConnectPageContent() {
     setIsSaving(false);
 
     if (!response.ok || !result.success) {
-      setMessage(result.error || "Could not save the Google Ads customer ID.");
+      setMessage(friendlySetupMessage(result.error || "Could not save the Google Ads customer ID."));
       return;
     }
 
@@ -299,7 +337,7 @@ function ConnectPageContent() {
     setIsTesting(false);
 
     if (!response.ok || !result.success) {
-      setMessage(result.error || "Connection test failed.");
+      setMessage(friendlySetupMessage(result.error || "Connection test failed."));
       return;
     }
 
@@ -319,39 +357,47 @@ function ConnectPageContent() {
   const appConfigured = Boolean(status?.appConfig.configured);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background lg:pl-[240px]">
       <AppHeader />
-      <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 lg:grid-cols-[280px_1fr] lg:px-8">
+      <main className="mx-auto grid max-w-screen-xl gap-6 px-6 py-6 lg:grid-cols-[240px_1fr]">
         <aside className="space-y-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Private setup</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Connect Google Ads</h1>
+            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Private setup</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">Connect Google Ads</h1>
           </div>
-          <ol className="space-y-2">
+          <ol className="space-y-1">
             {steps.map((step, index) => {
               const isActive = step.id === currentStep;
               const isComplete = index < activeIndex;
               return (
                 <li
                   key={step.id}
-                  className={`rounded-lg border px-3 py-2 text-sm font-semibold ${isActive ? "border-primary bg-primary text-primary-foreground" : isComplete ? "border-green-200 bg-green-50 text-green-700" : "border-border bg-card text-muted-foreground"}`}
+                  className={`flex h-8 items-center rounded-sm px-2 text-sm transition-colors ${isActive ? "bg-accent font-medium text-accent-foreground" : isComplete ? "text-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
                 >
                   {index + 1}. {step.label}
                 </li>
               );
             })}
           </ol>
-          <Card className="text-sm text-muted-foreground">
+          <Card className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
             {appConfigured || isMock ? "Google app credentials are handled by the app. You only need to connect Google and choose the Ads account." : "App credentials are missing in environment variables, so this setup includes one admin credential step."}
           </Card>
-          <Button variant="secondary" asChild><Link href="/dashboard">Dashboard</Link></Button>
+          <Button variant="ghost" asChild><Link href="/dashboard">Dashboard</Link></Button>
         </aside>
 
         <section className="space-y-4">
-          {isMock ? <Card className="border-primary/20 bg-primary/10 text-sm font-medium text-primary">Mock setup mode is active for local testing.</Card> : null}
-          {message ? <Card className="border-orange-200 bg-orange-50 text-sm font-medium text-foreground">{message}</Card> : null}
+          {isMock ? <Card className="rounded-lg border border-border bg-card p-4 text-sm font-medium text-foreground">Mock setup mode is active for local testing.</Card> : null}
+          {message ? <Card className="rounded-lg border border-border bg-card p-4 text-sm font-medium text-foreground">{message}</Card> : null}
+          {status?.appConfig.warnings?.length ? (
+            <Card className="rounded-lg border border-border bg-card p-4 text-sm text-foreground">
+              <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Setup warnings</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+                {status.appConfig.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+              </ul>
+            </Card>
+          ) : null}
 
-          <Card>
+          <Card className="rounded-lg border border-border bg-card p-6">
             <CardHeader><CardTitle>{steps[activeIndex]?.label || "Setup"}</CardTitle></CardHeader>
 
             {currentStep === "credentials" ? (
@@ -359,17 +405,17 @@ function ConnectPageContent() {
                 <div className="space-y-2 md:col-span-2">
                   <Label>Developer token</Label>
                   <Input {...form.register("developerToken")} autoComplete="off" />
-                  {form.formState.errors.developerToken ? <p className="text-sm text-destructive">{form.formState.errors.developerToken.message}</p> : null}
+                  {form.formState.errors.developerToken ? <p className="mt-1.5 text-xs text-destructive">{form.formState.errors.developerToken.message}</p> : null}
                 </div>
                 <div className="space-y-2">
                   <Label>OAuth client ID</Label>
                   <Input {...form.register("clientId")} autoComplete="off" />
-                  {form.formState.errors.clientId ? <p className="text-sm text-destructive">{form.formState.errors.clientId.message}</p> : null}
+                  {form.formState.errors.clientId ? <p className="mt-1.5 text-xs text-destructive">{form.formState.errors.clientId.message}</p> : null}
                 </div>
                 <div className="space-y-2">
                   <Label>OAuth client secret</Label>
                   <Input type="password" {...form.register("clientSecret")} autoComplete="off" />
-                  {form.formState.errors.clientSecret ? <p className="text-sm text-destructive">{form.formState.errors.clientSecret.message}</p> : null}
+                  {form.formState.errors.clientSecret ? <p className="mt-1.5 text-xs text-destructive">{form.formState.errors.clientSecret.message}</p> : null}
                 </div>
                 <div className="flex flex-wrap gap-2 md:col-span-2">
                   <Button onClick={() => void saveManualCredentials()} disabled={isSaving}>{isSaving ? <LoadingSpinner /> : <KeyRound className="h-4 w-4" />}Save and continue</Button>
@@ -380,16 +426,36 @@ function ConnectPageContent() {
 
             {currentStep === "google" ? (
               <div className="space-y-4">
-                <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
                   Google will ask for access to Google Ads. After approval, Score Ads stores only the refresh token needed for API calls.
                 </div>
+                {!isMock && status?.appConfig.redirectUri ? (
+                  <div className="rounded-lg border border-border bg-card p-4 text-sm">
+                    <p className="font-semibold text-foreground">Required Google OAuth redirect URI</p>
+                    <p className="mt-1 text-muted-foreground">Google Cloud Console → APIs &amp; Services → Credentials → your OAuth Web Client → Authorized redirect URIs.</p>
+                    <div className="mt-3 flex flex-col gap-2 rounded-md bg-muted p-3 font-mono text-xs text-foreground sm:flex-row sm:items-center sm:justify-between">
+                      <span className="break-all">{status.appConfig.redirectUri}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(status.appConfig.redirectUri);
+                          setCopiedRedirect(true);
+                          window.setTimeout(() => setCopiedRedirect(false), 1600);
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />{copiedRedirect ? "Copied" : "Copy"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="flex flex-wrap gap-2">
                   {isMock ? (
                     <Button onClick={simulateGoogleConnect}><ShieldCheck className="h-4 w-4" />Simulate Google connect</Button>
                   ) : (
                     <Button asChild><a href="/api/google-ads/auth/start"><ExternalLink className="h-4 w-4" />Connect Google account</a></Button>
                   )}
-                  {!appConfigured && !isMock ? <Button variant="secondary" onClick={() => setCurrentStep("credentials")}>Edit app credentials</Button> : null}
+                  {!appConfigured && !isMock ? <Button variant="ghost" onClick={() => setCurrentStep("credentials")}>Edit app credentials</Button> : null}
                 </div>
               </div>
             ) : null}
@@ -397,7 +463,7 @@ function ConnectPageContent() {
             {currentStep === "customer" ? (
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" onClick={() => void fetchAccessibleCustomers()} disabled={isFetchingCustomers}>
+                  <Button variant="ghost" onClick={() => void fetchAccessibleCustomers()} disabled={isFetchingCustomers}>
                     {isFetchingCustomers ? <LoadingSpinner /> : <RefreshCw className="h-4 w-4" />}
                     Find accessible accounts
                   </Button>
@@ -411,15 +477,20 @@ function ConnectPageContent() {
                         key={customer.resourceName}
                         type="button"
                         onClick={() => setSelectedCustomerId(customer.id)}
-                        className={`rounded-lg border p-4 text-left text-sm transition-colors ${selectedCustomerId === customer.id ? "border-primary bg-primary/10 text-foreground" : "border-border bg-card text-muted-foreground hover:bg-accent"}`}
+                        className={`rounded-lg border border-border p-4 text-left text-sm transition-colors ${selectedCustomerId === customer.id ? "bg-accent text-accent-foreground" : "bg-card text-muted-foreground hover:bg-muted/50"}`}
                       >
-                        <span className="block font-semibold text-foreground">{customer.formattedId}</span>
-                        <span>{customer.resourceName}</span>
+                        <span className="block font-semibold text-foreground">{customer.descriptiveName || customer.formattedId}</span>
+                        <span>{customer.formattedId} · {customer.resourceName}</span>
+                        {typeof customer.apiAccessible === "boolean" ? (
+                          <span className={`mt-3 block text-xs font-medium ${customer.apiAccessible ? "text-muted-foreground" : "text-destructive"}`}>
+                            {customer.apiAccessible ? `${customer.testAccount ? "Test account" : "API accessible"}` : customer.accessError || "API access failed"}
+                          </span>
+                        ) : null}
                       </button>
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-dashed border-border bg-muted/40 p-5 text-sm text-muted-foreground">No accounts loaded yet.</div>
+                  <div className="rounded-lg border border-dashed border-border bg-card p-5 text-sm text-muted-foreground">No accounts loaded yet.</div>
                 )}
 
                 <div className="grid gap-4 md:grid-cols-2">
@@ -439,12 +510,12 @@ function ConnectPageContent() {
 
             {currentStep === "test" ? (
               <div className="space-y-4">
-                <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
                   The test checks OAuth, developer token, customer ID, and Google Ads API access together.
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button onClick={() => void testConnection()} disabled={isTesting}>{isTesting ? <LoadingSpinner /> : <CheckCircle2 className="h-4 w-4" />}Test connection</Button>
-                  <Button variant="secondary" asChild><Link href="/create">Create campaign</Link></Button>
+                  <Button variant="ghost" asChild><Link href="/create">Create campaign</Link></Button>
                 </div>
               </div>
             ) : null}

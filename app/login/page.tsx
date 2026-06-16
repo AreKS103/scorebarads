@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 
 type AuthMode = "signin" | "signup" | "verify";
 
@@ -17,6 +17,9 @@ function getInitialNotice() {
   }
   if (params.get("reset") === "1") {
     return "Your password has been updated. Sign in with the new password.";
+  }
+  if (params.get("reason") === "timeout") {
+    return "You were logged out after 30 minutes of inactivity.";
   }
   return "";
 }
@@ -32,38 +35,32 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  async function routeAfterAuth(userId: string) {
-    const supabase = createClient();
-    const { data } = await supabase.rpc("get_google_ads_credentials", { p_user_id: userId }).maybeSingle();
-    const credentials = data as { refresh_token?: string | null; customer_id?: string | null } | null;
-
-    if (credentials?.refresh_token && credentials?.customer_id) {
-      router.push("/dashboard");
-      router.refresh();
-      return;
-    }
-
-    router.push("/connect");
+  const routeAfterAuth = useCallback(async () => {
+    const response = await fetch("/api/auth/next-route", { cache: "no-store" });
+    const result = await response.json().catch(() => ({}));
+    router.replace(result.path || "/connect");
     router.refresh();
-  }
+  }, [router]);
 
   useEffect(() => {
     setNotice(getInitialNotice());
     if (!isSupabaseConfigured()) return;
 
-    const supabase = createClient();
     let isMounted = true;
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (isMounted && data.user) {
-        void routeAfterAuth(data.user.id);
-      }
-    });
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((result) => {
+        if (isMounted && result.success) {
+          void routeAfterAuth();
+        }
+      })
+      .catch(() => null);
 
     return () => {
       isMounted = false;
     };
-  }, [router]);
+  }, [routeAfterAuth]);
 
   function selectMode(nextMode: AuthMode) {
     setMode(nextMode);
@@ -83,21 +80,20 @@ export default function LoginPage() {
     }
 
     setIsSubmitting(true);
-    const { error: signInError } = await createClient().auth.signInWithPassword({
-      email,
-      password,
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
     });
+    const result = await response.json();
 
-    if (signInError) {
-      setError(signInError.message);
+    if (!response.ok || !result.success) {
+      setError(result.error || "Sign in failed.");
       setIsSubmitting(false);
       return;
     }
 
-    const { data } = await createClient().auth.getUser();
-    if (data.user) {
-      await routeAfterAuth(data.user.id);
-    }
+    await routeAfterAuth();
   }
 
   async function handleSignUp(event: React.FormEvent<HTMLFormElement>) {
@@ -121,29 +117,28 @@ export default function LoginPage() {
     }
 
     setIsSubmitting(true);
-    const { data, error: signUpError } = await createClient().auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/login?verified=1`,
-      },
+    const response = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
     });
+    const result = await response.json().catch(() => ({}));
 
     setIsSubmitting(false);
 
-    if (signUpError) {
-      const message = signUpError.message.toLowerCase();
-      if (message.includes("already") || message.includes("registered")) {
+    if (!response.ok || !result.success) {
+      const message = String(result.error || "Sign up failed.");
+      if (message.toLowerCase().includes("already") || message.toLowerCase().includes("registered")) {
         setMode("signin");
         setError("An account with this email already exists. Sign in with your password instead.");
         return;
       }
-      setError(signUpError.message);
+      setError(message);
       return;
     }
 
-    if (data.session) {
-      await routeAfterAuth(data.session.user.id);
+    if (result.hasSession) {
+      await routeAfterAuth();
       return;
     }
 

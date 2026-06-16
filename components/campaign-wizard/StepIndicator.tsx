@@ -12,8 +12,8 @@ interface StepIndicatorProps {
 
 export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) {
   return (
-    <nav aria-label="Campaign builder progress" className="rounded-xl border border-border bg-card p-3">
-      <ol className="grid gap-2 md:grid-cols-6">
+    <nav aria-label="Campaign builder progress" className="rounded-lg border border-border bg-card p-2">
+      <ol className="grid gap-1 md:grid-cols-6">
         {steps.map((label, index) => {
           const step = index + 1;
           const isComplete = step < currentStep;
@@ -24,13 +24,11 @@ export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) 
                 type="button"
                 onClick={() => onStepClick(step)}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors",
-                  isActive && "bg-primary text-primary-foreground",
-                  isComplete && !isActive && "bg-orange-50 text-primary",
-                  !isActive && !isComplete && "bg-muted/40 text-muted-foreground hover:bg-secondary",
+                  "flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+                  isActive && "bg-accent font-medium text-accent-foreground",
                 )}
               >
-                <span className={cn("flex h-6 w-6 items-center justify-center rounded-full border text-xs", isActive ? "border-white" : "border-current")}>{isComplete ? <Check className="h-4 w-4" /> : step}</span>
+                <span className="flex h-5 w-5 items-center justify-center text-xs text-muted-foreground">{isComplete ? <Check className="h-4 w-4" /> : step}</span>
                 <span className="truncate">{label}</span>
               </button>
             </li>

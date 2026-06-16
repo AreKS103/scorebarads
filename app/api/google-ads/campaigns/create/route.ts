@@ -11,6 +11,7 @@ import {
   type CreationState,
 } from "@/lib/google-ads/campaigns";
 import { dollarToMicros } from "@/lib/google-ads/utils";
+import { rateLimitResponse, withCsrfCheck } from "@/lib/security";
 import type { CampaignFormData, PushProgressEvent } from "@/lib/types";
 import { campaignFormSchema } from "@/lib/validations";
 
@@ -45,9 +46,17 @@ function collectAssetResourceNames(formData: CampaignFormData) {
   return { marketingImages: [], squareMarketingImages: [] };
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withCsrfCheck(async function POST(request: NextRequest) {
   try {
     const { user } = await requireUser();
+    const rateLimited = await rateLimitResponse({
+      identifier: `campaign-create:${user.id}`,
+      limit: 5,
+    });
+
+    if (rateLimited) {
+      return rateLimited;
+    }
     const body = await request.json();
     const parsed = campaignFormSchema.parse(body) as CampaignFormData;
 
@@ -138,4 +147,4 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return jsonError(error, 400);
   }
-}
+});

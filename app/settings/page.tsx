@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { createClient } from "@/lib/supabase/client";
 
 interface CredentialsView {
   customer_id: string | null;
@@ -28,12 +27,20 @@ export default function SettingsPage() {
   const [language, setLanguage] = useState("English, Khmer");
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return;
-      setUserId(data.user.id);
-      const { data: saved } = await supabase.rpc("get_google_ads_credentials", { p_user_id: data.user.id }).single();
-      setCredentials(saved as CredentialsView | null);
+    fetch("/api/auth/me", { cache: "no-store" }).then(async (authResponse) => {
+      const authResult = await authResponse.json().catch(() => ({}));
+      if (!authResponse.ok || !authResult.success) return;
+      setUserId(authResult.userId);
+      const statusResponse = await fetch("/api/google-ads/setup/status", { cache: "no-store" });
+      const statusResult = await statusResponse.json().catch(() => ({}));
+      if (statusResponse.ok && statusResult.success) {
+        setCredentials({
+          customer_id: statusResult.credentials.customerId || null,
+          manager_customer_id: statusResult.credentials.managerCustomerId || null,
+          refresh_token: statusResult.credentials.hasOAuth ? "connected" : null,
+          updated_at: null,
+        });
+      }
     });
     setCurrency(window.localStorage.getItem("score.defaultCurrency") || "USD");
     setGeoTarget(window.localStorage.getItem("score.defaultGeoTarget") || "Phnom Penh");
@@ -49,46 +56,44 @@ export default function SettingsPage() {
 
   async function disconnect() {
     if (!userId) return;
-    const { error } = await createClient().from("google_ads_credentials").delete().eq("user_id", userId);
-    setMessage(error ? error.message : "Google Ads credentials disconnected.");
-    if (!error) setCredentials(null);
+    const response = await fetch("/api/google-ads/disconnect", { method: "DELETE" });
+    const result = await response.json().catch(() => ({}));
+    setMessage(response.ok && result.success ? "Google Ads credentials disconnected." : result.error || "Disconnect failed.");
+    if (response.ok && result.success) setCredentials(null);
   }
 
   async function clearCachedData() {
     if (!userId) return;
-    const supabase = createClient();
-    const [campaigns, drafts] = await Promise.all([
-      supabase.from("campaigns_log").delete().eq("user_id", userId),
-      supabase.from("ad_drafts").delete().eq("user_id", userId),
-    ]);
-    setMessage(campaigns.error?.message || drafts.error?.message || "Cached campaign logs and drafts cleared.");
+    const response = await fetch("/api/data/clear-cache", { method: "DELETE" });
+    const result = await response.json().catch(() => ({}));
+    setMessage(response.ok && result.success ? "Cached campaign logs and drafts cleared." : result.error || "Could not clear cached data.");
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background lg:pl-[240px]">
       <AppHeader />
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 lg:px-8">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-primary">Owner controls</p>
-          <h1 className="text-3xl font-bold text-foreground">Settings</h1>
+      <main className="mx-auto max-w-screen-xl space-y-6 px-6 py-6">
+        <div className="border-b border-border pb-4">
+          <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Owner controls</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Settings</h1>
         </div>
-        {message ? <Card className="border-orange-200 bg-orange-50 text-sm font-medium text-foreground">{message}</Card> : null}
+        {message ? <Card className="rounded-lg border border-border bg-card p-4 text-sm font-medium text-foreground">{message}</Card> : null}
 
         <Card>
           <CardHeader><CardTitle>Google Ads Connection</CardTitle></CardHeader>
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2 rounded-lg bg-muted/40 p-4">
+            <div className="space-y-2 rounded-lg border border-border bg-card p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</p>
               <StatusBadge status={credentials?.refresh_token ? "ENABLED" : "PAUSED"} />
             </div>
-            <div className="space-y-2 rounded-lg bg-muted/40 p-4">
+            <div className="space-y-2 rounded-lg border border-border bg-card p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer ID</p>
               <p className="font-semibold text-foreground">{credentials?.customer_id || "Not connected"}</p>
               {credentials?.manager_customer_id ? <p className="text-sm text-muted-foreground">Manager: {credentials.manager_customer_id}</p> : null}
             </div>
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
-            <Button variant="secondary" asChild><Link href="/connect"><PlugZap className="h-4 w-4" />Re-connect</Link></Button>
+            <Button variant="ghost" asChild><Link href="/connect"><PlugZap className="h-4 w-4" />Re-connect</Link></Button>
             <Button variant="destructive" onClick={disconnect}>Disconnect</Button>
           </div>
         </Card>
